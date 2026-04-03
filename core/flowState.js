@@ -1,22 +1,6 @@
 'use strict';
 
-/**
- * Global workflow state for the app core (not wired to UI).
- * @type {{
- *   currentStep: 'scan' | 'action' | 'confirm' | 'done',
- *   selectedItem: object | null,
- *   selectedJob: object | null,
- *   movementType: string | null,
- *   quantity: number,
- *   resetFlow: () => void,
- *   setItem: (item: object) => void,
- *   setJob: (job: object) => void,
- *   setMovement: (type: string | null) => void,
- *   setQuantity: (qty: number) => void,
- *   goToConfirm: () => boolean,
- *   completeFlow: () => void,
- * }}
- */
+// Global workflow state for the app core (not wired to UI yet).
 const flowState = {
   currentStep: 'scan',
   selectedItem: null,
