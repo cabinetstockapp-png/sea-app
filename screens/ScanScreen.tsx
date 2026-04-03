@@ -65,7 +65,7 @@ export default function ScanScreen() {
         const scannedCode = raw;
         const scannedItem = { barcode: scannedCode };
         flowState.setItem(scannedItem);
-        navigation.navigate('Action' as never);
+        navigation.navigate('Assign' as never, { barcode: scannedCode } as never);
       }, 0);
     },
     [navigation],
