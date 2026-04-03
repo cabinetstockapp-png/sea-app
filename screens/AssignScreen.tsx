@@ -148,7 +148,10 @@ export default function AssignScreen() {
     const finalTo = locationInput?.trim() ?? '';
     flowState.setQuantity(Math.max(1, parseInt(qty, 10) || 1));
     flowState.setMovement(mode === 'IN' ? 'IN' : 'MOVE');
-    flowState.setJob({ toLocation: finalTo || GENERAL_STOCK });
+    flowState.setJob({
+      toLocation: finalTo || GENERAL_STOCK,
+      sources: mode === 'MOVE' ? selectedSources : [],
+    });
 
     if (mode === 'IN' && !finalTo) {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -162,14 +165,7 @@ export default function AssignScreen() {
     const ok = flowState.goToConfirm();
 
     if (ok) {
-      navigation.navigate(
-        'ConfirmMove' as never,
-        {
-          barcode,
-          toLocation: locationInput ?? '',
-          sources: mode === 'MOVE' ? JSON.stringify(selectedSources) : '[]',
-        } as never,
-      );
+      navigation.navigate('ConfirmMove' as never);
     } else {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
