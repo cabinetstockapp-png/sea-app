@@ -43,7 +43,9 @@ const flowState = {
     const hasItem = this.selectedItem != null;
     const hasJob = this.selectedJob != null;
     const hasMovement =
-      this.movementType === 'IN' || this.movementType === 'OUT';
+      this.movementType === 'IN' ||
+      this.movementType === 'OUT' ||
+      this.movementType === 'MOVE';
     const hasQty =
       typeof this.quantity === 'number' &&
       Number.isFinite(this.quantity) &&
