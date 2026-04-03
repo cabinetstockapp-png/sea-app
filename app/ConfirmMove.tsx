@@ -1,8 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useNavigation } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const flowState = require('../core/flowState');
 
 const SEA_ITEMS_KEY = 'SEA_ITEMS';
 const GENERAL_STOCK = 'General Stock';
@@ -47,27 +50,48 @@ function getAvailableQty(
   return q;
 }
 
-function paramString(v: string | string[] | undefined): string {
-  if (v == null) return '';
-  return typeof v === 'string' ? v : v[0] ?? '';
+function getBarcodeFromFlow(): string {
+  const item = flowState.selectedItem;
+  if (item && typeof item === 'object' && item !== null && 'barcode' in item) {
+    const b = (item as { barcode?: unknown }).barcode;
+    return typeof b === 'string' ? b : '';
+  }
+  return '';
+}
+
+function getSourcesFromFlow(): { location: string; qty: number }[] {
+  const job = flowState.selectedJob;
+  if (
+    job &&
+    typeof job === 'object' &&
+    job !== null &&
+    'sources' in job &&
+    Array.isArray((job as { sources?: unknown }).sources)
+  ) {
+    return ((job as { sources: { location: string; qty: number }[] }).sources).map((s) => ({
+      location: s.location,
+      qty: s.qty,
+    }));
+  }
+  return [];
+}
+
+function getToLocationFromFlow(): string {
+  const job = flowState.selectedJob;
+  if (job && typeof job === 'object' && job !== null && 'toLocation' in job) {
+    const t = (job as { toLocation?: unknown }).toLocation;
+    return typeof t === 'string' ? t : '';
+  }
+  return '';
 }
 
 export default function ConfirmMove() {
-  const router = useRouter();
-  const { barcode, sources, toLocation } = useLocalSearchParams();
+  const navigation = useNavigation();
 
-  const parsedSources = useMemo(() => {
-    // Step requirement: parse from JSON param.
-    try {
-      const raw = Array.isArray(sources) ? sources[0] ?? '[]' : sources ?? '[]';
-      return JSON.parse(raw) as { location: string; qty: number }[];
-    } catch {
-      return [];
-    }
-  }, [sources]);
+  const parsedSources = useMemo(() => getSourcesFromFlow(), []);
 
-  const barcodeStr = paramString(barcode);
-  const toLocationStr = paramString(toLocation);
+  const barcodeStr = getBarcodeFromFlow();
+  const toLocationStr = getToLocationFromFlow();
 
   const [editableSources, setEditableSources] = useState(() =>
     parsedSources.map((s) => ({ ...s })),
@@ -105,15 +129,17 @@ export default function ConfirmMove() {
         }
       }
 
+      const code = getBarcodeFromFlow();
+      const to = getToLocationFromFlow()?.trim() || '';
+
       const now = Date.now();
-      const to = toLocationStr?.trim() || '';
       const newItems: SeaItem[] = [];
       const simItems = [...items];
 
       for (const s of editableSources) {
         if (s.qty <= 0) continue;
 
-        const avail = getAvailableQty(simItems, barcodeStr, s.location);
+        const avail = getAvailableQty(simItems, code, s.location);
         if (s.qty > avail) {
           void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
           return;
@@ -121,7 +147,7 @@ export default function ConfirmMove() {
 
         for (let i = 0; i < s.qty; i++) {
           const row: SeaItem = {
-            barcode: barcodeStr,
+            barcode: code,
             fromLocation: s.location === GENERAL_STOCK ? '' : s.location,
             toLocation: to,
             type: 'MOVE',
@@ -134,17 +160,21 @@ export default function ConfirmMove() {
 
       if (newItems.length === 0) {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-        router.back();
+        navigation.goBack();
         return;
       }
 
       await AsyncStorage.setItem(SEA_ITEMS_KEY, JSON.stringify(items.concat(newItems)));
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      router.back();
+
+      flowState.completeFlow();
+      flowState.resetFlow();
+      console.log('Flow: completed and reset');
+      navigation.navigate('Scan' as never);
     } catch {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
-  }, [barcodeStr, editableSources, router, toLocationStr]);
+  }, [editableSources, navigation]);
 
   return (
     <View style={styles.container}>
@@ -156,7 +186,21 @@ export default function ConfirmMove() {
           {barcodeStr || '—'}
         </Text>
 
-        <Text style={{ color: 'red' }}>DEBUG TO: {toLocationStr}</Text>
+        <Text style={{ color: 'red' }}>
+          DEBUG TO: {toLocationStr}
+        </Text>
+
+        <Text style={{ color: '#aaa' }}>
+          Job: {flowState.selectedJob ? JSON.stringify(flowState.selectedJob) : '—'}
+        </Text>
+
+        <Text style={{ color: '#aaa' }}>
+          Movement: {flowState.movementType != null ? String(flowState.movementType) : '—'}
+        </Text>
+
+        <Text style={{ color: '#aaa' }}>
+          Quantity: {typeof flowState.quantity === 'number' ? flowState.quantity : '—'}
+        </Text>
 
         {editableSources.map((s, i) => (
           <View key={i} style={{ marginBottom: 10 }}>
@@ -234,4 +278,3 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.98 }],
   },
 });
-
