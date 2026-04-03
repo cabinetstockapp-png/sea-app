@@ -169,7 +169,7 @@ export default function ConfirmMove() {
 
       flowState.completeFlow();
       flowState.resetFlow();
-      console.log('Flow: completed and reset');
+      console.log("Flow: completed and reset");
       navigation.navigate('Scan' as never);
     } catch {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -187,19 +187,9 @@ export default function ConfirmMove() {
         </Text>
 
         <Text style={{ color: 'red' }}>
-          DEBUG TO: {toLocationStr}
-        </Text>
-
-        <Text style={{ color: '#aaa' }}>
-          Job: {flowState.selectedJob ? JSON.stringify(flowState.selectedJob) : '—'}
-        </Text>
-
-        <Text style={{ color: '#aaa' }}>
-          Movement: {flowState.movementType != null ? String(flowState.movementType) : '—'}
-        </Text>
-
-        <Text style={{ color: '#aaa' }}>
-          Quantity: {typeof flowState.quantity === 'number' ? flowState.quantity : '—'}
+          DEBUG TO: {toLocationStr} | job {flowState.selectedJob ? JSON.stringify(flowState.selectedJob) : '—'} |
+          movement {flowState.movementType != null ? String(flowState.movementType) : '—'} | qty{' '}
+          {typeof flowState.quantity === 'number' ? flowState.quantity : '—'}
         </Text>
 
         {editableSources.map((s, i) => (
