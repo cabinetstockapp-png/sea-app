@@ -4,11 +4,13 @@ import {
   CameraView,
   useCameraPermissions,
 } from 'expo-camera';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { useStore } from '@/context/StoreContext';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const flowState = require('../core/flowState');
 
 const BARCODE_TYPES: BarcodeType[] = [
   'qr',
@@ -27,8 +29,7 @@ const BARCODE_TYPES: BarcodeType[] = [
 ];
 
 export default function ScanScreen() {
-  const router = useRouter();
-  const { setLastScannedBarcode } = useStore();
+  const navigation = useNavigation();
   const [permission, requestPermission] = useCameraPermissions();
   const scannedRef = useRef(false);
   const [active, setActive] = useState(true);
@@ -62,12 +63,12 @@ export default function ScanScreen() {
         }
 
         const scannedCode = raw;
-        setLastScannedBarcode(scannedCode);
-        setError(null);
-        router.replace({ pathname: '/Assign', params: { barcode: scannedCode } });
+        const scannedItem = { barcode: scannedCode };
+        flowState.setItem(scannedItem);
+        navigation.navigate('Action' as never);
       }, 0);
     },
-    [router, setLastScannedBarcode],
+    [navigation],
   );
 
   if (!permission) {

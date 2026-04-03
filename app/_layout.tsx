@@ -19,6 +19,7 @@ export default function RootLayout() {
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="Scan" />
+          <Stack.Screen name="Action" />
           <Stack.Screen name="Assign" />
           <Stack.Screen name="ItemDetail" />
           <Stack.Screen name="ConfirmMove" />
