@@ -137,6 +137,11 @@ export default function AssignScreen() {
     setShowDropdown(true);
   }, []);
 
+  const parsedQty = Math.max(1, parseInt(qty, 10) || 1);
+  const accumulatedQty = selectedSources.reduce((sum, s) => sum + s.qty, 0);
+  const remainingQty = Math.max(0, parsedQty - accumulatedQty);
+  const moveSaveBlocked = mode === 'MOVE' && remainingQty > 0;
+
   const handleSavePress = () => {
     console.log('LOCKED TO →', locationInput);
 
@@ -169,11 +174,6 @@ export default function AssignScreen() {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
   };
-
-  const parsedQty = Math.max(1, parseInt(qty, 10) || 1);
-  const accumulatedQty = selectedSources.reduce((sum, s) => sum + s.qty, 0);
-  const remainingQty = Math.max(0, parsedQty - accumulatedQty);
-  const moveSaveBlocked = mode === 'MOVE' && remainingQty > 0;
 
   return (
     <View style={styles.container}>
