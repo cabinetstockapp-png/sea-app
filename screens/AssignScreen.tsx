@@ -1,8 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useNavigation } from '@react-navigation/native';
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const flowState = require('../core/flowState');
 
 const SEA_ITEMS_KEY = 'SEA_ITEMS';
 
@@ -15,16 +18,17 @@ function displayLocationKey(loc: string | null | undefined): string {
   return s === '' ? GENERAL_STOCK : s;
 }
 
-function paramString(v: string | string[] | undefined): string {
-  if (v == null) return '';
-  return typeof v === 'string' ? v : v[0] ?? '';
+function barcodeFromFlow(): string {
+  const item = flowState.selectedItem;
+  if (item && typeof item === 'object' && item !== null && 'barcode' in item) {
+    const b = (item as { barcode?: unknown }).barcode;
+    return typeof b === 'string' ? b : '';
+  }
+  return '';
 }
 
 export default function AssignScreen() {
-  const router = useRouter();
-  const params = useLocalSearchParams<{ barcode?: string }>();
-  const barcode = paramString(params.barcode);
-
+  const navigation = useNavigation();
   const [selectedSources, setSelectedSources] = useState<{ location: string; qty: number }[]>([]);
   const [locationInput, setLocationInput] = useState('');
   const [filteredJobs, setFilteredJobs] = useState(JOBS);
@@ -33,6 +37,17 @@ export default function AssignScreen() {
   const [mode, setMode] = useState<'IN' | 'MOVE'>('IN'); // IN or MOVE
   const [pressed, setPressed] = useState<'save' | null>(null);
   const [sourceOptions, setSourceOptions] = useState<{ location: string; qty: number }[]>([]);
+
+  const barcode = barcodeFromFlow();
+
+  useEffect(() => {
+    flowState.setMovement(mode === 'IN' ? 'IN' : 'MOVE');
+  }, [mode]);
+
+  useEffect(() => {
+    const n = Math.max(1, parseInt(qty, 10) || 1);
+    flowState.setQuantity(n);
+  }, [qty]);
 
   useEffect(() => {
     const load = async () => {
@@ -106,6 +121,7 @@ export default function AssignScreen() {
 
   const handleSearch = useCallback((text: string) => {
     setLocationInput(text);
+    flowState.setJob({ toLocation: text });
 
     if (!text) {
       setFilteredJobs(JOBS);
@@ -121,83 +137,36 @@ export default function AssignScreen() {
     setShowDropdown(true);
   }, []);
 
-  const saveLocation = useCallback(async (finalTo: string) => {
-    try {
-      const raw = await AsyncStorage.getItem(SEA_ITEMS_KEY);
-
-      type SeaItem = {
-        barcode: string;
-        updatedAt: number;
-        type?: string;
-        location?: string;
-        fromLocation?: string | null;
-        toLocation?: string;
-      };
-      let items: SeaItem[] = [];
-
-      if (raw) {
-        try {
-          const parsed: unknown = JSON.parse(raw);
-          if (Array.isArray(parsed)) {
-            items = parsed as SeaItem[];
-          }
-        } catch {
-          // use []
-        }
-      }
-
-      const quantity = Math.max(1, parseInt(qty, 10) || 1);
-      const target = finalTo?.trim();
-      const toStored = target && target.length > 0 ? target : '';
-
-      const now = Date.now();
-      const newItems = Array.from({ length: quantity }, () => ({
-        barcode,
-        fromLocation: null,
-        toLocation: toStored,
-        type: 'IN' as const,
-        updatedAt: now,
-      }));
-
-      items = items.concat(newItems);
-
-      await AsyncStorage.setItem(SEA_ITEMS_KEY, JSON.stringify(items));
-
-      setQty('1');
-      setSelectedSources([]);
-      handleSearch('');
-    } catch {
-      // ignore
-    }
-
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.back();
-  }, [barcode, handleSearch, router, qty]);
-
   const handleSavePress = () => {
     console.log('LOCKED TO →', locationInput);
 
-    if (mode === 'MOVE') {
-      router.push({
-        pathname: '/ConfirmMove',
-        params: {
-          barcode,
-          sources: JSON.stringify(selectedSources),
-          toLocation: locationInput,
-        },
-      });
+    const finalTo = locationInput?.trim() ?? '';
+    flowState.setQuantity(Math.max(1, parseInt(qty, 10) || 1));
+    flowState.setMovement(mode === 'IN' ? 'IN' : 'MOVE');
+    flowState.setJob({ toLocation: finalTo || GENERAL_STOCK });
+
+    if (mode === 'IN' && !finalTo) {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;
     }
 
-    if (mode === 'IN') {
-      const finalTo = locationInput?.trim() ?? '';
+    if (mode === 'MOVE' && moveSaveBlocked) {
+      return;
+    }
 
-      if (!finalTo) {
-        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        return;
-      }
+    const ok = flowState.goToConfirm();
 
-      void saveLocation(finalTo);
+    if (ok) {
+      navigation.navigate(
+        'ConfirmMove' as never,
+        {
+          barcode,
+          toLocation: locationInput ?? '',
+          sources: mode === 'MOVE' ? JSON.stringify(selectedSources) : '[]',
+        } as never,
+      );
+    } else {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
   };
 
@@ -215,7 +184,10 @@ export default function AssignScreen() {
       <View style={styles.modeRow}>
         <Pressable
           style={[styles.modeButton, mode === 'IN' && styles.modeActive]}
-          onPress={() => setMode('IN')}
+          onPress={() => {
+            setMode('IN');
+            flowState.setMovement('IN');
+          }}
           accessibilityRole="button"
           accessibilityLabel="Stock in">
           <Text style={styles.modeText}>IN</Text>
@@ -223,7 +195,10 @@ export default function AssignScreen() {
 
         <Pressable
           style={[styles.modeButton, mode === 'MOVE' && styles.modeActive]}
-          onPress={() => setMode('MOVE')}
+          onPress={() => {
+            setMode('MOVE');
+            flowState.setMovement('MOVE');
+          }}
           accessibilityRole="button"
           accessibilityLabel="Stock move">
           <Text style={styles.modeText}>MOVE</Text>
@@ -264,7 +239,11 @@ export default function AssignScreen() {
       <TextInput
         style={[styles.input, moveSaveBlocked && { borderColor: 'red' }]}
         value={qty}
-        onChangeText={setQty}
+        onChangeText={(t) => {
+          setQty(t);
+          const n = Math.max(1, parseInt(t, 10) || 1);
+          flowState.setQuantity(n);
+        }}
         keyboardType="numeric"
       />
 
@@ -305,6 +284,7 @@ export default function AssignScreen() {
               style={styles.dropdownItem}
               onPress={() => {
                 handleSearch(job);
+                flowState.setJob({ toLocation: job });
                 setShowDropdown(false);
               }}>
               <Text style={styles.dropdownText}>{job}</Text>
