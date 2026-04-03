@@ -187,9 +187,9 @@ export default function ConfirmMove() {
         </Text>
 
         <Text style={{ color: 'red' }}>
-          DEBUG TO: {toLocationStr} | job {flowState.selectedJob ? JSON.stringify(flowState.selectedJob) : '—'} |
-          movement {flowState.movementType != null ? String(flowState.movementType) : '—'} | qty{' '}
-          {typeof flowState.quantity === 'number' ? flowState.quantity : '—'}
+          DEBUG TO: {toLocationStr} | movement {flowState.movementType != null ? String(flowState.movementType) : '—'} |
+          qty {typeof flowState.quantity === 'number' ? flowState.quantity : '—'} | job{' '}
+          {flowState.selectedJob != null ? JSON.stringify(flowState.selectedJob) : '—'}
         </Text>
 
         {editableSources.map((s, i) => (
